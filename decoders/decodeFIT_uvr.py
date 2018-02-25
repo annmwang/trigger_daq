@@ -26,7 +26,7 @@ import sys, getopt,binstr, time, visual, commonTrig
 
 nevent = 0
 
-def decode(offsetflag, octgeo, overall_offset, offsets, hit, ip, id, flippedboards, occ):
+def decode(offsetflag, octgeo, overall_offset, offsets, hit, ip, id, flippedboards, occ, sl=False):
     strip = 0
     mybin = "{0:010b}".format(int(hit[id*4:id*4+4],16))
     margin = mybin[0]
@@ -44,7 +44,7 @@ def decode(offsetflag, octgeo, overall_offset, offsets, hit, ip, id, flippedboar
         ivmm = (strip/64)%8
         ich = strip%64+1
     else:
-        if strip is not 0 and int(occ[ip])==0:
+        if strip is not 0 and int(occ[ip])==0 and not sl:
             print "Occupancy header is 0 but strip isn't!"
             print "Event",nevent
             print hit,"on plane", ip
@@ -169,9 +169,9 @@ def main(argv):
                 for slope in slopes:
                     for j in range(2):
                         if (run > 3521):
-                            ivmm, ich = decode(offsetflag, octgeo, consts.OVERALLOFFSET, consts.OFFSETS, slope, iplane, j, consts.FLIPPEDBOARDS, occ)
+                            ivmm, ich = decode(offsetflag, octgeo, consts.OVERALLOFFSET, consts.OFFSETS, slope, iplane, j, consts.FLIPPEDBOARDS, occ, sl=True)
                         else:
-                            ivmm, ich = decode(offsetflag, octgeo, consts.OVERALLOFFSET, consts.OLDOFFSETS, slope, iplane, j, consts.FLIPPEDBOARDS, occ)
+                            ivmm, ich = decode(offsetflag, octgeo, consts.OVERALLOFFSET, consts.OLDOFFSETS, slope, iplane, j, consts.FLIPPEDBOARDS, occ, sl=True)
                         svmms.append(ivmm)
                         schs.append(ich)
                         iplane = iplane + 1
