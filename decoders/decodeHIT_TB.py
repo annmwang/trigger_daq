@@ -25,7 +25,8 @@
 # A.Wang, last edited Nov 21, 2016
 
 
-import sys, getopt, binstr, visual, commonTrig
+import sys, getopt, visual, commonTrig
+import argparse
 
 def decode(offsetflag, octgeo, overall_offset, offsets, hit, ip, id, occ):
     strip = 0
@@ -35,8 +36,6 @@ def decode(offsetflag, octgeo, overall_offset, offsets, hit, ip, id, occ):
     else:
         strip = int(hit[id*4:id*4+4],16)
     if int(occ[ip])==1:
-        #if ((ip == 1) or (ip == 2) or (ip == 4) or (ip == 7)) and (octgeo == 1):
-        #    strip = 512-strip-1
         ivmm = (strip/64)%8
         ich = strip%64
     else:
@@ -57,20 +56,18 @@ def main(argv):
     consts = commonTrig.tconsts()
 
     try:
-        opts, args = getopt.getopt(argv, "hi:o:r:f", ["ifile=", "ofile=", "run="])
+        opts, args = getopt.getopt(argv, "hi:o:r:f", ["ifile=", "ofile="])
     except getopt.GetoptError:
-        print 'decodeHIT_32bit.py -i <inputfile> -o <outputfile> -r <run> [-f]'
+        print 'decodeHIT_32bit.py -i <inputfile> -o <outputfile> [-f]'
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print 'decodeHIT_32bit.py -i <inputfile> -o <outputfile> -r <run> [-f]'
+            print 'decodeHIT_32bit.py -i <inputfile> -o <outputfile> [-f]'
             sys.exit()
         elif opt in ("-i", "--ifile"):
             inputfile = arg
         elif opt in ("-o", "--ofile"):
             outputfile = arg
-        elif opt in ('-r', "--run"):
-            run = int(arg)
         elif opt == '-f':
             offsetflag = 1
             
@@ -78,12 +75,6 @@ def main(argv):
         print "Adding offsets!"
     else:
         print colors.WARNING + "No offsets!" + colors.ENDC
-        
-    if (run==-1):
-        print colors.FAIL + "No run number!" + colors.ENDC
-        sys.exit(2)
-    if (run < 3522):
-        print colors.WARNING + "Using flipped offsets!" + colors.ENDC
         
     num_lines = sum(1 for line in open(inputfile))
     datafile = open(inputfile, 'r')
@@ -125,10 +116,7 @@ def main(argv):
             iplane = 0
             for hit in hits:
                 for j in range(2):
-                    if (run > 3521):
-                        ivmm, ich = decode(offsetflag, octgeo, consts.OVERALLOFFSET, consts.HITOFFSETS, hit, iplane, j, occ)
-                    else:
-                        ivmm, ich = decode(offsetflag, octgeo, consts.OVERALLOFFSET, consts.OLDHITOFFSETS, hit, iplane, j, occ)
+                    ivmm, ich = decode(offsetflag, octgeo, consts.OVERALLOFFSET, consts.HITOFFSETS, hit, iplane, j, occ)
                     vmms.append(ivmm)
                     chs.append(ich)
                     iplane = iplane + 1
