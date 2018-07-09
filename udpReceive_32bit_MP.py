@@ -1,12 +1,14 @@
+#!/usr/bin/env python
+
 # Receives UDP packets from the TP
 # Writes them into files depending on the address in the header
 
 # A.Wang, last edited Aug 17, 2017
 
-import sys, struct, time
+import sys, struct, time, datetime
 from udp import udp_fun
 
-from optparse import OptionParser
+import argparse
 import os.path
 
 from multiprocessing import Pool, Process, Queue, Value, Lock
@@ -23,35 +25,62 @@ UDP_IP = ""
 readInterval = 1
 nProc = 1
 
-
-debug = False
-useTestInput = False
-inputRate = 1000 #Hz
+tenToTheNinth = pow(10,9)
 
 printingSleep = 1 #s
 
 # toggle this to print out timestamps (or not)
 timeflag = True
 
+
+
+parser = argparse.ArgumentParser(usage="usage: prog [options] outputFileName")
+parser.add_argument("-n", "--newFile",
+                  action="store_true",
+                  dest="newFile",
+                  default=False,
+                  help="Forces overwriting of output files")
+parser.add_argument("-d", "--debug",
+                  action="store_true",
+                  default=False,
+                  help="Turns on debugging console output")
+parser.add_argument("-t", "--useTestInput",
+                  action="store_true",
+                  default=True,
+                  help="turns on internal test input")
+parser.add_argument("-r", "--inputRate",
+                  type=float,
+                  default=100,
+                  help="internal test input rate in Hz (may not actually represent input rate since this is done with a sleep)")
+parser.add_argument("-p","--nProc",
+                  type=int,
+                  default=1,
+                  help="number of worker threads")
+
+args = parser.parse_args()
+
+print (">>> ")
+
+# Print out the settings
+for setting in dir(args):
+    if not setting[0]=="_":
+        print (">>> ... Setting: {: >20}:  {}".format(setting, eval("args.%s"%setting) ))
+
+print (">>> ")
+
+
 # open all files
 outputFileName = 'mmtp_test'
 if any([os.path.isfile("%s_%d.dat" % (outputFileName, i)) for i in [20, 21, 22, 23]]):
-    sys.exit("Output file(s) already exist! Exiting.")
-file_20 = open("%s_%d.dat" % (outputFileName, 20), "a")
-file_21 = open("%s_%d.dat" % (outputFileName, 21), "a")
-file_22 = open("%s_%d.dat" % (outputFileName, 22), "a")
-file_23 = open("%s_%d.dat" % (outputFileName, 23), "a")
-files = [file_20, file_21, file_22, file_23]
+    if args.newFile:
+        print (">>> Removing old files since you specified the -n option")
+        os.system("rm %s_*.dat"%outputFileName)
+    else:
+        sys.exit("Output file(s) already exist! Exiting.")
+
+files = [open("%s_%d.dat" % (outputFileName, i), "a") for i in range(20,24)]
 
 def main():
-
-    parser = OptionParser(usage="usage: %prog [options] outputFileName")
-    parser.add_option("-n", "--newFile",
-                      action="store_true",
-                      dest="newFile",
-                      default=False,
-                      help="This option is deprecated as long as we need to open the files globally!")
-    (options, args) = parser.parse_args()
 
     udp_rec_mp()
 
@@ -95,41 +124,65 @@ def udp_rec_mp():
     q = Queue()
     Process(target=handleInput, args=(q,nProcessedCounter,intervalProcessedCounter) ).start()
 
-    printCounters(nProcessedCounter,nTriggersCounter, intervalProcessedCounter, intervalTriggersCounter)
+    startTime = datetime.datetime.now()
+    # print startTime
+    print (">>> Starting DAQ at %s"%(startTime.strftime("%H:%M:%S") ))
+    print (">>>")
+
+    timer = printCounters(nProcessedCounter,nTriggersCounter, intervalProcessedCounter, intervalTriggersCounter)
+
 
     try:
         while True:
-            if useTestInput:
+            if args.useTestInput:
                 data = '\xf0\x00\x01\x84\x00\x00\x00#\xa2\x00^\xa9\xcd\x10\xe1\xd8'*10
             else:
                 data, addr = udp.udp_recv(rawsock)
-            if debug:
+            if args.debug:
                 print (">>> Data being handed to the queue")
 
             nTriggersCounter.increment()
             intervalTriggersCounter.increment()
             q.put(data)
             # processPacket(data,files)
-            if useTestInput:
-                time.sleep(1./inputRate)
+            if args.useTestInput:
+                time.sleep(1./args.inputRate)
 
             if q.full():
+                timeSinceStart = datetime.datetime.now() - startTime
                 print (">>> ")
-                print (">>> WARNING: Buffer full!")
+                print (">>> WARNING: Buffer full! I've been running for %s"%str(timeSinceStart))
                 print (">>> ")
                 time.sleep(1)
 
     except KeyboardInterrupt:
-        print
+
+        print ( ">>>" )
         print ( ">>> Stopped!" )
+
+        printCounters(nProcessedCounter,nTriggersCounter, intervalProcessedCounter, intervalTriggersCounter)
+
+        while not q.empty():
+            print (">>> ")
+            print (">>> Waiting for buffer to clear...")
+            print (">>> ")
+            time.sleep(1)
+
+        print ( ">>> " )
         print ( ">>> Closing files..." )
+        print ( ">>> " )
+
         rawsock.close()
         for file in files:
             file.flush()
             os.fsync(file.fileno())
             file.close()
+
         print ( ">>> Files closed. Have a nice day!" )
+        sys.exit(0)
+
     except:
+
         print (">>> Something screwed up in udp_rec_mp()...")
 
 # define a few new functions. These will be thrown in a multi-threading pool.
@@ -152,8 +205,7 @@ def printCounters(nProcessedCounter,nTriggersCounter,intervalProcessedCounter,in
     intervalProcessedCounter.reset()
     intervalTriggersCounter.reset()
 
-    return
-
+    return timer
 
 def init_worker():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -162,15 +214,18 @@ def init_worker():
 def handleInput(q, counter1, counter2):
     pool = Pool(processes=nProc, initializer=init_worker)
     while True:
-        if debug:
-            print ( "Number of packets in buffer: N" )
         try:
             pool.apply_async(processPacket, (q.get(), ))
             counter1.increment()
             counter2.increment()
         except KeyboardInterrupt:
-            # pool.terminate()
-            # pool.join()
+            while not q.empty():
+                if args.debug:
+                    print (".")
+                # processPacket(q.get())
+                pool.apply_async(processPacket, (q.get(), ))
+                counter1.increment()
+                counter2.increment()
             break
         except:
             print (">>> handleInput: Something has happened in launching child process")
@@ -178,38 +233,38 @@ def handleInput(q, counter1, counter2):
 
 def processPacket(data):
 
-    if debug:
+    # startTime = datetime.datetime.now()
+
+    if args.debug:
         print (">>> processPacket: Processing packet")
 
     datalist = [format(int(hex(ord(c)), 16), '02X') for c in list(data)]
 
-    if debug:
-        print( " ".join(datalist) )
-
-    if len(datalist) > 7:
+    try: #for speed
         addrnum = datalist[7] # address number reading from
         del datalist[:8]
 
         wordcount = 0
         myfile = files[int(addrnum)-20]
 
-        if debug:
-            print( ">>> processPacket: Writing packet to file " , int(addrnum) )
-
         wordout = ''
-        fittime = time.time()*pow(10,9)
         if (timeflag):
+            fittime = time.time()*tenToTheNinth
             myfile.write('TIME: ' + '%f'%fittime + '\n')
         for byte in datalist:
-            wordcount = wordcount + 1
-            wordout = wordout + byte
+            wordcount += 1
+            wordout += byte
             if wordcount == 4:
                 myfile.write(str(wordout) + '\n')
                 # print (wordout)
                 wordout = ''
                 wordcount = 0
-                # myfile.flush()
-                # os.fsync(myfile.fileno())
+        myfile.flush()
+        os.fsync(myfile.fileno())
+    except:
+        return
+
+    # print(datetime.datetime.now() - startTime)
     return
 
 
