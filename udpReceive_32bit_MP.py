@@ -46,7 +46,7 @@ parser.add_argument("-d", "--debug",
                   help="Turns on debugging console output")
 parser.add_argument("-t", "--useTestInput",
                   action="store_true",
-                  default=True,
+                  default=False,
                   help="turns on internal test input")
 parser.add_argument("-r", "--inputRate",
                   type=float,
