@@ -92,6 +92,9 @@ def main(argv):
         elif opt == "--sl":
             slopeflag = 1
         elif opt == "--st":
+            print
+            print "ARE YOU SURE YOU WANT TO DECODE STRIPS? USUALLY WE DO SLOPES."
+            print
             stripflag = 1
 
     if not (slopeflag or stripflag):
