@@ -89,7 +89,7 @@ def main(argv):
             #print buflen, int(bcid, 16)
 
             for i in range(8):
-                vmmdata.append(int(artdata[i*6:i*6+6],2)+1)
+                vmmdata.append(int(artdata[i*6:i*6+6],2))
 
             for i in range(32):
                 if (hitmap[i] is "1"):
