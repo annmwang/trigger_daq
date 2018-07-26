@@ -26,6 +26,8 @@ def main(argv):
 
     lines = []
     lastn = -1
+    skips = 0
+    skipped = 0
     
     print "\n"
     print colors.DARK + "Decoding!       " + "ψ ︿_____︿_ψ_ ☾\t "+ colors.ENDC
@@ -55,6 +57,8 @@ def main(argv):
             if (ntrig-lastn-1) != 0 and (ntrig-lastn-1)!= -65536 and lastn != -1:
                 print "\nSkipped a trigger! On Event",ntrig
                 print "Skipped", ntrig-lastn-1
+                skips += 1
+                skipped += (ntrig-lastn-1)
 
             lastn = ntrig
             timing = lines[1]
@@ -71,6 +75,10 @@ def main(argv):
     print "\n"
     print colors.DES + "Done decoding!  " + "ψ ︿_____︿_ψ_ ☼\t "+ colors.ENDC
     print "\n"
+    print
+    print "N(skips)   = %i" % (skips)
+    print "N(skipped) = %i" % (skipped)
+    print
 
 if __name__ == "__main__":
     main(sys.argv[1:])
